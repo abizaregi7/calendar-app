@@ -5,7 +5,7 @@ import hashlib
 from datetime import date, datetime, timedelta
 from collections import defaultdict
 from streamlit_calendar import calendar
-from streamlit_sortables import sortables
+from streamlit_sortables import sort_items
 
 # =============================
 # CONFIG
@@ -57,16 +57,17 @@ st.markdown("""
     box-shadow:0 4px 14px rgba(0,0,0,0.05);
     font-size:0.85rem;
 }
-.project-title { font-weight:600; }
-.project-client { font-size:0.75rem; color:#666; }
+
+.kanban-card {
+    background:#ffffff;
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.05);
+    font-size:0.8rem;
+}
 </style>
 """, unsafe_allow_html=True)
-
-# =============================
-# STATE
-# =============================
-if "selected_id" not in st.session_state:
-    st.session_state.selected_id = None
 
 # =============================
 # LOAD DATA
@@ -112,117 +113,10 @@ for p in data["projects"]:
     if start_week <= d <= end_week:
         weekly_projects[d].append(p)
 
-# ✅ ONLY DAYS WITH PROJECT
 for day in sorted(weekly_projects.keys()):
     st.markdown(f"### {day.strftime('%A, %d %B %Y')}")
     for p in weekly_projects[day]:
         st.markdown(
             f"""
             <div class="project-card" style="--accent:{p['color']}">
-                <div class="project-title">{p['project']}</div>
-                <div class="project-client">{p['client']}</div>
-                <div>{p['detail']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-# =============================
-# KANBAN BOARD (DRAG & DROP)
-# =============================
-st.markdown("---")
-st.markdown("## 🧩 Kanban Board")
-
-todo_items = [
-    f"{p['id']}|{p['project']} ({p['client']})"
-    for p in data["projects"] if p["status"] == "todo"
-]
-
-done_items = [
-    f"{p['id']}|{p['project']} ({p['client']})"
-    for p in data["projects"] if p["status"] == "done"
-]
-
-kanban = sortables(
-    {
-        "Todo": todo_items,
-        "Done": done_items
-    },
-    direction="horizontal"
-)
-
-# =============================
-# UPDATE STATUS FROM KANBAN
-# =============================
-id_map = {p["id"]: p for p in data["projects"]}
-
-for item in kanban["Todo"]:
-    pid = item.split("|")[0]
-    id_map[pid]["status"] = "todo"
-
-for item in kanban["Done"]:
-    pid = item.split("|")[0]
-    id_map[pid]["status"] = "done"
-
-save_data(data)
-
-# =============================
-# MONTHLY CALENDAR
-# =============================
-st.markdown("---")
-st.markdown("## 📅 Monthly Calendar")
-
-events = []
-for p in data["projects"]:
-    events.append({
-        "id": p["id"],
-        "title": f"{p['client']} | {p['project']} - {p['detail']}",
-        "start": p["deadline"],
-        "color": p["color"]
-    })
-
-calendar_state = calendar(
-    events=events,
-    options={
-        "initialView": "dayGridMonth",
-        "height": "750px"
-    }
-)
-
-# =============================
-# EVENT CLICK (EDIT)
-# =============================
-if calendar_state and calendar_state.get("eventClick"):
-    st.session_state.selected_id = calendar_state["eventClick"]["event"]["id"]
-
-if st.session_state.selected_id:
-    p = next(x for x in data["projects"] if x["id"] == st.session_state.selected_id)
-
-    st.markdown("---")
-    st.markdown("### ✏️ Edit Project")
-
-    new_client = st.text_input("Client", p["client"])
-    new_project = st.text_input("Project", p["project"])
-    new_detail = st.text_area("Detail", p["detail"])
-    new_deadline = st.date_input("Deadline", parse_date(p["deadline"]))
-
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Update", use_container_width=True):
-            p.update({
-                "client": new_client,
-                "project": new_project,
-                "detail": new_detail,
-                "deadline": new_deadline.strftime("%Y-%m-%d"),
-                "color": client_color(new_client)
-            })
-            save_data(data)
-            st.session_state.selected_id = None
-            st.rerun()
-
-    with col2:
-        if st.button("Delete", use_container_width=True):
-            data["projects"] = [x for x in data["projects"] if x["id"] != p["id"]]
-            save_data(data)
-            st.session_state.selected_id = None
-            st.rerun()
+                <strong>
