@@ -119,4 +119,65 @@ for day in sorted(weekly_projects.keys()):
         st.markdown(
             f"""
             <div class="project-card" style="--accent:{p['color']}">
-                <strong>
+                <strong>{p['project']}</strong><br>
+                <small>{p['client']}</small><br>
+                {p['detail']}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+# =============================
+# KANBAN BOARD (DRAG & DROP)
+# =============================
+st.markdown("---")
+st.markdown("## 🧩 Kanban Board")
+
+todo_items = [
+    {"id": p["id"], "label": f"{p['project']} ({p['client']})"}
+    for p in data["projects"] if p["status"] == "todo"
+]
+
+done_items = [
+    {"id": p["id"], "label": f"{p['project']} ({p['client']})"}
+    for p in data["projects"] if p["status"] == "done"
+]
+
+kanban = sort_items(
+    {
+        "Todo": todo_items,
+        "Done": done_items
+    },
+    direction="horizontal",
+    key="kanban"
+)
+
+# =============================
+# UPDATE STATUS
+# =============================
+id_map = {p["id"]: p for p in data["projects"]}
+
+for item in kanban["Todo"]:
+    id_map[item["id"]]["status"] = "todo"
+
+for item in kanban["Done"]:
+    id_map[item["id"]]["status"] = "done"
+
+save_data(data)
+
+# =============================
+# MONTHLY CALENDAR
+# =============================
+st.markdown("---")
+st.markdown("## 📅 Monthly Calendar")
+
+events = []
+for p in data["projects"]:
+    events.append({
+        "id": p["id"],
+        "title": f"{p['client']} | {p['project']} - {p['detail']}",
+        "start": p["deadline"],
+        "color": p["color"]
+    })
+
+calendar(events=events, options={"initialView": "dayGridMonth", "height": "750px"})
