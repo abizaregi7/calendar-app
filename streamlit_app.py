@@ -62,7 +62,7 @@ if st.sidebar.button("Simpan Project"):
         data["projects"].append(new_project)
         save_data(data)
         st.sidebar.success("Project berhasil ditambahkan!")
-        st.experimental_rerun()
+        st.rerun()
     else:
         st.sidebar.error("Nama klien dan project wajib diisi.")
 
