@@ -5,11 +5,12 @@ import hashlib
 from datetime import date, datetime, timedelta
 from collections import defaultdict
 from streamlit_calendar import calendar
+from streamlit_sortables import sortables
 
 # =============================
 # CONFIG
 # =============================
-st.set_page_config(page_title="Project Calendar", layout="wide")
+st.set_page_config(page_title="Project Manager", layout="wide")
 DATA_FILE = "data.json"
 
 # =============================
@@ -32,11 +33,10 @@ def parse_date(d):
     return datetime.strptime(d, "%Y-%m-%d").date()
 
 # =============================
-# CSS — CLEAN + CARD + WRAP
+# CSS — CLEAN UI
 # =============================
 st.markdown("""
 <style>
-/* Calendar wrap fix */
 .fc-daygrid-event,
 .fc-daygrid-event-harness,
 .fc-event-title-container,
@@ -44,35 +44,21 @@ st.markdown("""
     white-space: normal !important;
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
-    line-height: 1.35 !important;
     font-size: 0.8rem;
 }
-.fc-daygrid-event-dot { display: none !important; }
+.fc-daygrid-event-dot { display:none!important; }
 
-/* Weekly cards */
-.week-day {
-    margin-top: 24px;
-}
 .project-card {
-    background: #ffffff;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-    border-left: 6px solid var(--accent);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.05);
+    background:#fff;
+    border-radius:10px;
+    padding:12px 14px;
+    margin-bottom:10px;
+    border-left:6px solid var(--accent);
+    box-shadow:0 4px 14px rgba(0,0,0,0.05);
+    font-size:0.85rem;
 }
-.project-title {
-    font-weight: 600;
-    font-size: 0.95rem;
-}
-.project-client {
-    font-size: 0.75rem;
-    color: #666;
-}
-.project-detail {
-    font-size: 0.85rem;
-    margin-top: 6px;
-}
+.project-title { font-weight:600; }
+.project-client { font-size:0.75rem; color:#666; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,15 +91,14 @@ if st.sidebar.button("Save Project", use_container_width=True):
             "project": project,
             "detail": detail,
             "deadline": deadline.strftime("%Y-%m-%d"),
-            "color": client_color(client)
+            "color": client_color(client),
+            "status": "todo"
         })
         save_data(data)
         st.rerun()
-    else:
-        st.sidebar.error("Client & Project wajib diisi")
 
 # =============================
-# WEEKLY VIEW (LIST + CARD)
+# WEEKLY VIEW (FILTERED)
 # =============================
 st.markdown("## 🗓 Weekly View")
 
@@ -127,24 +112,59 @@ for p in data["projects"]:
     if start_week <= d <= end_week:
         weekly_projects[d].append(p)
 
-for i in range(7):
-    day = start_week + timedelta(days=i)
-    st.markdown(f"### {day.strftime('%A, %d %B %Y')}", help="Weekly execution focus")
+# ✅ ONLY DAYS WITH PROJECT
+for day in sorted(weekly_projects.keys()):
+    st.markdown(f"### {day.strftime('%A, %d %B %Y')}")
+    for p in weekly_projects[day]:
+        st.markdown(
+            f"""
+            <div class="project-card" style="--accent:{p['color']}">
+                <div class="project-title">{p['project']}</div>
+                <div class="project-client">{p['client']}</div>
+                <div>{p['detail']}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    if day in weekly_projects:
-        for p in weekly_projects[day]:
-            st.markdown(
-                f"""
-                <div class="project-card" style="--accent:{p['color']}">
-                    <div class="project-title">{p['project']}</div>
-                    <div class="project-client">{p['client']}</div>
-                    <div class="project-detail">{p['detail']}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-    else:
-        st.caption("No project")
+# =============================
+# KANBAN BOARD (DRAG & DROP)
+# =============================
+st.markdown("---")
+st.markdown("## 🧩 Kanban Board")
+
+todo_items = [
+    f"{p['id']}|{p['project']} ({p['client']})"
+    for p in data["projects"] if p["status"] == "todo"
+]
+
+done_items = [
+    f"{p['id']}|{p['project']} ({p['client']})"
+    for p in data["projects"] if p["status"] == "done"
+]
+
+kanban = sortables(
+    {
+        "Todo": todo_items,
+        "Done": done_items
+    },
+    direction="horizontal"
+)
+
+# =============================
+# UPDATE STATUS FROM KANBAN
+# =============================
+id_map = {p["id"]: p for p in data["projects"]}
+
+for item in kanban["Todo"]:
+    pid = item.split("|")[0]
+    id_map[pid]["status"] = "todo"
+
+for item in kanban["Done"]:
+    pid = item.split("|")[0]
+    id_map[pid]["status"] = "done"
+
+save_data(data)
 
 # =============================
 # MONTHLY CALENDAR
@@ -170,36 +190,26 @@ calendar_state = calendar(
 )
 
 # =============================
-# EVENT CLICK
+# EVENT CLICK (EDIT)
 # =============================
 if calendar_state and calendar_state.get("eventClick"):
     st.session_state.selected_id = calendar_state["eventClick"]["event"]["id"]
 
-# =============================
-# DETAIL PANEL (EDIT / DELETE)
-# =============================
 if st.session_state.selected_id:
-    project_data = next(
-        p for p in data["projects"]
-        if p["id"] == st.session_state.selected_id
-    )
+    p = next(x for x in data["projects"] if x["id"] == st.session_state.selected_id)
 
     st.markdown("---")
-    st.markdown("### ✏️ Project Detail")
+    st.markdown("### ✏️ Edit Project")
 
-    new_client = st.text_input("Client", project_data["client"])
-    new_project = st.text_input("Project", project_data["project"])
-    new_detail = st.text_area("Detail", project_data["detail"])
-    new_deadline = st.date_input(
-        "Deadline",
-        parse_date(project_data["deadline"])
-    )
+    new_client = st.text_input("Client", p["client"])
+    new_project = st.text_input("Project", p["project"])
+    new_detail = st.text_area("Detail", p["detail"])
+    new_deadline = st.date_input("Deadline", parse_date(p["deadline"]))
 
-    col1, col2, col3 = st.columns(3)
-
+    col1, col2 = st.columns(2)
     with col1:
-        if st.button("💾 Update", use_container_width=True):
-            project_data.update({
+        if st.button("Update", use_container_width=True):
+            p.update({
                 "client": new_client,
                 "project": new_project,
                 "detail": new_detail,
@@ -211,17 +221,8 @@ if st.session_state.selected_id:
             st.rerun()
 
     with col2:
-        if st.button("🗑 Delete", use_container_width=True):
-            data["projects"] = [
-                p for p in data["projects"]
-                if p["id"] != project_data["id"]
-            ]
+        if st.button("Delete", use_container_width=True):
+            data["projects"] = [x for x in data["projects"] if x["id"] != p["id"]]
             save_data(data)
             st.session_state.selected_id = None
             st.rerun()
-
-    with col3:
-        if st.button("✖ Close", use_container_width=True):
-            st.session_state.selected_id = None
-            st.rerun()
-
