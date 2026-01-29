@@ -165,11 +165,11 @@ kanban = sort_items(
     key="kanban"
 )
 
-for item in kanban["To-Do"]:
+for item in kanban["todo"]:
     pid = item.split("|")[0]
     id_map[pid]["status"] = "To-Do"
 
-for item in kanban["Done"]:
+for item in kanban["done"]:
     pid = item.split("|")[0]
     id_map[pid]["status"] = "Done"
 
