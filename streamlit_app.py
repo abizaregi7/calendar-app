@@ -50,10 +50,6 @@ st.markdown("""
     border-radius:12px;
     padding:16px;
 }
-.kanban-title {
-    font-weight:600;
-    margin-bottom:12px;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -67,6 +63,13 @@ if "selected_id" not in st.session_state:
 # LOAD DATA
 # =============================
 data = load_data()
+
+# =============================
+# DATE RANGE — WEEKLY (SINGLE SOURCE OF TRUTH)
+# =============================
+today = date.today()
+start_week = today - timedelta(days=today.weekday())
+end_week = start_week + timedelta(days=6)
 
 # =============================
 # SIDEBAR — ADD PROJECT
@@ -104,19 +107,15 @@ if st.sidebar.button("Save Project", use_container_width=True):
 # =============================
 st.markdown("## 🗓 Weekly View")
 
-today = date.today()
-start_week = today - timedelta(days=today.weekday())
-end_week = start_week + timedelta(days=6)
-
-weekly = defaultdict(list)
+weekly_projects = defaultdict(list)
 for p in data["projects"]:
     d = parse_date(p["deadline"])
     if start_week <= d <= end_week:
-        weekly[d].append(p)
+        weekly_projects[d].append(p)
 
-for day in sorted(weekly.keys()):
+for day in sorted(weekly_projects.keys()):
     st.markdown(f"### {day.strftime('%A, %d %B %Y')}")
-    for p in weekly[day]:
+    for p in weekly_projects[day]:
         st.markdown(
             f"""
             <div class="project-card" style="--accent:{p['color']}">
@@ -129,17 +128,22 @@ for day in sorted(weekly.keys()):
         )
 
 # =============================
-# KANBAN (STABLE VERSION)
+# KANBAN — WEEKLY ONLY
 # =============================
 st.markdown("---")
-st.markdown("## 🧩 Kanban Board")
+st.markdown("## 🧩 Kanban Board (This Week Only)")
+
+weekly_only = [
+    p for p in data["projects"]
+    if start_week <= parse_date(p["deadline"]) <= end_week
+]
 
 todo_col, done_col = st.columns(2)
 
 with todo_col:
     st.markdown("### 🟦 To-Do")
-    for p in [x for x in data["projects"] if x["status"] == "todo"]:
-        with st.container():
+    for p in weekly_only:
+        if p["status"] == "todo":
             st.markdown(
                 f"""
                 <div class="project-card" style="--accent:{p['color']}">
@@ -156,8 +160,8 @@ with todo_col:
 
 with done_col:
     st.markdown("### ✅ Done")
-    for p in [x for x in data["projects"] if x["status"] == "done"]:
-        with st.container():
+    for p in weekly_only:
+        if p["status"] == "done":
             st.markdown(
                 f"""
                 <div class="project-card" style="--accent:{p['color']}">
@@ -173,7 +177,7 @@ with done_col:
                 st.rerun()
 
 # =============================
-# MONTHLY CALENDAR
+# MONTHLY CALENDAR (ALL PROJECTS)
 # =============================
 st.markdown("---")
 st.markdown("## 📅 Monthly Calendar")
@@ -193,7 +197,7 @@ calendar_state = calendar(
 )
 
 # =============================
-# EDIT / DELETE
+# EDIT / DELETE (FROM CALENDAR)
 # =============================
 if calendar_state and calendar_state.get("eventClick"):
     st.session_state.selected_id = calendar_state["eventClick"]["event"]["id"]
