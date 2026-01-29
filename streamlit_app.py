@@ -148,18 +148,18 @@ st.markdown("## 🧩 Kanban Board")
 
 todo_items = [
     f"{p['id']}|{p['project']} ({p['client']})"
-    for p in data["projects"] if p["status"] == "To-Do"
+    for p in data["projects"] if p["status"] == "todo"
 ]
 
 done_items = [
     f"{p['id']}|{p['project']} ({p['client']})"
-    for p in data["projects"] if p["status"] == "Done"
+    for p in data["projects"] if p["status"] == "done"
 ]
 
 kanban = sort_items(
     {
-        "To-Do": todo_items,
-        "Done": done_items
+        "todo": todo_items,
+        "done": done_items
     },
     direction="horizontal",
     key="kanban"
