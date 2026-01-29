@@ -28,32 +28,32 @@ def client_color(client):
     return "#" + hashlib.md5(client.encode()).hexdigest()[:6]
 
 # =============================
-# UI STYLE (LINEAR / NOTION)
+# HARD CSS OVERRIDE (WRAP FIX)
 # =============================
 st.markdown("""
 <style>
-.fc {
-    font-size: 13px;
-}
+/* FORCE EVENT TEXT WRAP — FINAL FIX */
+.fc-daygrid-event,
+.fc-daygrid-event-harness,
+.fc-event-title-container,
 .fc-event-title {
     white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+    word-break: break-word !important;
     overflow-wrap: anywhere !important;
-    word-break: break-word;
-    line-height: 1.35;
+    line-height: 1.35 !important;
     font-size: 0.8rem;
 }
+
+/* Clean style ala Linear */
 .fc-daygrid-event {
     border-radius: 6px;
     padding: 2px 4px;
 }
+
 .fc-daygrid-event-dot {
-    display: none;
-}
-.panel {
-    background: #ffffff;
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
+    display: none !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -115,13 +115,13 @@ calendar_state = calendar(
 )
 
 # =============================
-# HANDLE EVENT CLICK
+# EVENT CLICK
 # =============================
 if calendar_state and calendar_state.get("eventClick"):
     st.session_state.selected_id = calendar_state["eventClick"]["event"]["id"]
 
 # =============================
-# MODAL-LIKE DETAIL PANEL
+# DETAIL PANEL (MODAL-LIKE)
 # =============================
 if st.session_state.selected_id:
     project_data = next(
@@ -131,10 +131,7 @@ if st.session_state.selected_id:
 
     st.markdown("---")
     with st.container():
-        st.markdown('<div class="panel">', unsafe_allow_html=True)
-
-        st.markdown(f"### {project_data['project']}")
-        st.caption(f"{project_data['client']} • {project_data['deadline']}")
+        st.markdown("### ✏️ Project Detail")
 
         new_client = st.text_input("Client", project_data["client"])
         new_project = st.text_input("Project", project_data["project"])
@@ -173,5 +170,3 @@ if st.session_state.selected_id:
             if st.button("✖ Close", use_container_width=True):
                 st.session_state.selected_id = None
                 st.rerun()
-
-        st.markdown('</div>', unsafe_allow_html=True)
