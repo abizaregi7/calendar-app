@@ -2,16 +2,13 @@ import streamlit as st
 import json
 import os
 import hashlib
+from datetime import date
 from streamlit_calendar import calendar
 
 # =============================
 # CONFIG
 # =============================
-st.set_page_config(
-    page_title="Project Calendar",
-    layout="wide"
-)
-
+st.set_page_config(page_title="Project Calendar", layout="wide")
 DATA_FILE = "data.json"
 
 # =============================
@@ -31,13 +28,10 @@ def client_color(client):
     return "#" + hashlib.md5(client.encode()).hexdigest()[:6]
 
 # =============================
-# CLEAN UI (LINEAR / NOTION STYLE)
+# UI STYLE (LINEAR / NOTION)
 # =============================
 st.markdown("""
 <style>
-body {
-    background-color: #fafafa;
-}
 .fc {
     font-size: 13px;
 }
@@ -55,17 +49,20 @@ body {
 .fc-daygrid-event-dot {
     display: none;
 }
-.sidebar-content {
-    background-color: #ffffff;
+.panel {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.06);
 }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================
-# TITLE
+# STATE
 # =============================
-st.markdown("## 📅 Project Management Calendar")
-st.caption("Minimal, clear, and focused — like Linear & Notion")
+if "selected_id" not in st.session_state:
+    st.session_state.selected_id = None
 
 # =============================
 # LOAD DATA
@@ -95,7 +92,7 @@ if st.sidebar.button("Save Project", use_container_width=True):
         save_data(data)
         st.rerun()
     else:
-        st.sidebar.error("Client & Project required")
+        st.sidebar.error("Client & Project wajib diisi")
 
 # =============================
 # CALENDAR EVENTS
@@ -106,70 +103,75 @@ for p in data["projects"]:
         "id": p["id"],
         "title": f"{p['client']} | {p['project']} - {p['detail']}",
         "start": p["deadline"],
-        "end": p["deadline"],
         "color": p["color"]
     })
 
-calendar_options = {
-    "initialView": "dayGridMonth",
-    "height": "800px",
-    "headerToolbar": {
-        "left": "prev,next today",
-        "center": "title",
-        "right": "dayGridMonth,timeGridWeek"
-    }
-}
-
-# =============================
-# RENDER CALENDAR
-# =============================
 calendar_state = calendar(
     events=events,
-    options=calendar_options
+    options={
+        "initialView": "dayGridMonth",
+        "height": "750px"
+    }
 )
 
 # =============================
-# EVENT CLICK → MODAL
+# HANDLE EVENT CLICK
 # =============================
 if calendar_state and calendar_state.get("eventClick"):
-    event_id = calendar_state["eventClick"]["event"]["id"]
-    project_data = next(p for p in data["projects"] if p["id"] == event_id)
+    st.session_state.selected_id = calendar_state["eventClick"]["event"]["id"]
 
-    with st.dialog("📌 Project Detail"):
+# =============================
+# MODAL-LIKE DETAIL PANEL
+# =============================
+if st.session_state.selected_id:
+    project_data = next(
+        p for p in data["projects"]
+        if p["id"] == st.session_state.selected_id
+    )
+
+    st.markdown("---")
+    with st.container():
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+
         st.markdown(f"### {project_data['project']}")
-        st.markdown(f"**Client:** {project_data['client']}")
-        st.markdown(f"**Deadline:** {project_data['deadline']}")
-        st.markdown("---")
+        st.caption(f"{project_data['client']} • {project_data['deadline']}")
 
         new_client = st.text_input("Client", project_data["client"])
-        new_project = st.text_input("Project Name", project_data["project"])
+        new_project = st.text_input("Project", project_data["project"])
         new_detail = st.text_area("Detail", project_data["detail"])
         new_deadline = st.date_input(
             "Deadline",
-            value=st.session_state.get(
-                "edit_deadline",
-                st.date_input("", label_visibility="collapsed")
-            )
+            date.fromisoformat(project_data["deadline"])
         )
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             if st.button("💾 Update", use_container_width=True):
-                project_data["client"] = new_client
-                project_data["project"] = new_project
-                project_data["detail"] = new_detail
-                project_data["deadline"] = new_deadline.strftime("%Y-%m-%d")
-                project_data["color"] = client_color(new_client)
+                project_data.update({
+                    "client": new_client,
+                    "project": new_project,
+                    "detail": new_detail,
+                    "deadline": new_deadline.strftime("%Y-%m-%d"),
+                    "color": client_color(new_client)
+                })
                 save_data(data)
+                st.session_state.selected_id = None
                 st.rerun()
 
         with col2:
             if st.button("🗑 Delete", use_container_width=True):
                 data["projects"] = [
-                    p for p in data["projects"] if p["id"] != event_id
+                    p for p in data["projects"]
+                    if p["id"] != project_data["id"]
                 ]
                 save_data(data)
+                st.session_state.selected_id = None
                 st.rerun()
 
+        with col3:
+            if st.button("✖ Close", use_container_width=True):
+                st.session_state.selected_id = None
+                st.rerun()
 
+        st.markdown('</div>', unsafe_allow_html=True)
