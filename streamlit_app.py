@@ -148,12 +148,12 @@ st.markdown("## 🧩 Kanban Board")
 
 todo_items = [
     f"{p['id']}|{p['project']} ({p['client']})"
-    for p in data["projects"] if p["status"] == "todo"
+    for p in data["projects"] if p["status"] == "To-Do"
 ]
 
 done_items = [
     f"{p['id']}|{p['project']} ({p['client']})"
-    for p in data["projects"] if p["status"] == "done"
+    for p in data["projects"] if p["status"] == "Done"
 ]
 
 kanban = sort_items(
@@ -167,11 +167,11 @@ kanban = sort_items(
 
 for item in kanban["To-Do"]:
     pid = item.split("|")[0]
-    id_map[pid]["status"] = "todo"
+    id_map[pid]["status"] = "To-Do"
 
 for item in kanban["Done"]:
     pid = item.split("|")[0]
-    id_map[pid]["status"] = "done"
+    id_map[pid]["status"] = "Done"
 
 save_data(data)
 
@@ -192,7 +192,7 @@ for p in data["projects"]:
 
 calendar_state = calendar(
     events=events,
-    options={"initialView": "dayGridMonth", "height": "750px"}
+    options={"initialView": "dayGridMonth", "height": "500px"}
 )
 
 # =============================
